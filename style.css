@@ -441,6 +441,7 @@ body {
   padding: 12px 0;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
   animation: row-in 0.18s ease;
 }
@@ -465,6 +466,7 @@ body {
 }
 
 .query-input-wrap {
+  flex: 0 0 auto;
   display: flex;
   align-items: stretch;
   border: 1px solid var(--border);
