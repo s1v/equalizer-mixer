@@ -425,20 +425,35 @@ body {
 }
 
 /* ============================================================
-   Query Panel
+   Query Rows
    ============================================================ */
-.query-body {
+.query-rows {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: center;
+  flex-direction: column;
+  gap: 0;
 }
 
-.query-form {
+.query-row {
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: row-in 0.18s ease;
+}
+
+.query-row + .query-row {
+  border-top: 1px solid var(--border);
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.query-row-form {
   display: flex;
   gap: 8px;
   align-items: stretch;
-  flex-shrink: 0;
 }
 
 .query-input-wrap {
@@ -509,18 +524,33 @@ body {
   box-shadow: none;
 }
 
+.btn-delete-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  margin-left: auto;
+}
+
+.btn-delete-row:hover {
+  color: var(--danger);
+  background: var(--danger-dim);
+  border-color: rgba(248, 113, 113, 0.25);
+}
+
 /* ============================================================
    Query Result
    ============================================================ */
-.query-result {
-  flex: 1;
-  min-width: 200px;
-}
-
-.result-placeholder {
-  font-size: 0.83rem;
-  color: var(--text-subtle);
-}
+.query-row-result:empty { display: none; }
 
 .result-error {
   font-size: 0.83rem;

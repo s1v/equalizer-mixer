@@ -372,43 +372,117 @@ function clearEQ(eqKey) {
   updateChart();
 }
 
-// ─── UI: Frequency Query ──────────────────────────────────────────────────────
+// ─── Query Rows ───────────────────────────────────────────────────────────────
 
-function doQuery() {
-  const input  = document.getElementById('query-freq');
-  const result = document.getElementById('query-result');
-  const freq   = parseFloat(input.value);
+let nextQueryId = 0;
+// [{ id, freq, result: null | { g1, g2, gm, fLabel } }]
+const queryRows = [];
 
+function freqLabel(freq) {
+  return freq >= 1000
+    ? `${(freq / 1000).toPrecision(4).replace(/\.?0+$/, '')} kHz`
+    : `${freq} Hz`;
+}
+
+function addQueryRow() {
+  const id = nextQueryId++;
+  queryRows.push({ id, freq: '', result: null });
+  renderQueryRows();
+  // Focus the new input
+  const input = document.querySelector(`.query-row[data-id="${id}"] .query-input`);
+  if (input) input.focus();
+}
+
+function removeQueryRow(id) {
+  const idx = queryRows.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  queryRows.splice(idx, 1);
+  if (queryRows.length === 0) addQueryRow();
+  else renderQueryRows();
+}
+
+function executeQuery(id) {
+  const row  = queryRows.find(r => r.id === id);
+  if (!row) return;
+
+  const freq = parseFloat(row.freq);
   if (!isFinite(freq) || freq <= 0) {
-    result.innerHTML = '<span class="result-error">有効な周波数を入力してください（例: 1000）</span>';
+    row.result = { error: '有効な周波数を入力してください（例: 1000）' };
+    renderQueryRows();
     return;
   }
 
-  const g1  = gainAtFreq(state.eq1, freq);
-  const g2  = gainAtFreq(state.eq2, freq);
-  const gm  = (g1 + g2) / 2;
+  const g1 = gainAtFreq(state.eq1, freq);
+  const g2 = gainAtFreq(state.eq2, freq);
+  row.result = { g1, g2, gm: (g1 + g2) / 2, fLabel: freqLabel(freq) };
+  renderQueryRows();
+
+  // Add new empty row only if this is the last one
+  const isLast = queryRows[queryRows.length - 1].id === id;
+  if (isLast) addQueryRow();
+}
+
+function renderQueryRows() {
   const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + ' dB';
+  const container = document.getElementById('query-rows');
+  container.innerHTML = '';
 
-  const fLabel = freq >= 1000
-    ? `${(freq / 1000).toPrecision(4).replace(/\.?0+$/, '')} kHz`
-    : `${freq} Hz`;
+  for (const row of queryRows) {
+    const el = document.createElement('div');
+    el.className = 'query-row';
+    el.dataset.id = row.id;
 
-  result.innerHTML = `
-    <div class="result-grid">
-      <div class="result-item result-item--eq1">
-        <span class="result-label">EQ 1</span>
-        <span class="result-value">${fmt(g1)}</span>
+    let resultHTML = '';
+    if (row.result) {
+      if (row.result.error) {
+        resultHTML = `<div class="query-row-result"><span class="result-error">${row.result.error}</span></div>`;
+      } else {
+        const { g1, g2, gm, fLabel } = row.result;
+        resultHTML = `
+          <div class="query-row-result">
+            <div class="result-grid">
+              <div class="result-item result-item--eq1">
+                <span class="result-label">EQ 1</span>
+                <span class="result-value">${fmt(g1)}</span>
+              </div>
+              <div class="result-item result-item--eq2">
+                <span class="result-label">EQ 2</span>
+                <span class="result-value">${fmt(g2)}</span>
+              </div>
+              <div class="result-item result-item--mixed">
+                <span class="result-label">ミックス @ ${fLabel}</span>
+                <span class="result-value">${fmt(gm)}</span>
+              </div>
+            </div>
+          </div>`;
+      }
+    }
+
+    el.innerHTML = `
+      <div class="query-row-form">
+        <div class="query-input-wrap">
+          <input
+            type="number"
+            class="query-input"
+            placeholder="1000"
+            min="1" max="96000" step="1"
+            value="${row.freq}"
+            aria-label="周波数 (Hz)"
+          >
+          <span class="query-unit">Hz</span>
+        </div>
+        <button class="btn-primary btn-get">取得</button>
+        <button class="btn-delete-row" aria-label="この行を削除" title="削除">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
-      <div class="result-item result-item--eq2">
-        <span class="result-label">EQ 2</span>
-        <span class="result-value">${fmt(g2)}</span>
-      </div>
-      <div class="result-item result-item--mixed">
-        <span class="result-label">ミックス @ ${fLabel}</span>
-        <span class="result-value">${fmt(gm)}</span>
-      </div>
-    </div>
-  `;
+      ${resultHTML}
+    `;
+
+    container.appendChild(el);
+  }
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
@@ -418,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBands('eq1');
   renderBands('eq2');
   updateChart();
+  addQueryRow();
 
   // Add band
   document.getElementById('add-eq1').addEventListener('click', () => addBand('eq1'));
@@ -444,9 +519,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Query
-  document.getElementById('query-btn').addEventListener('click', doQuery);
-  document.getElementById('query-freq').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doQuery();
+  // Query rows — event delegation on container
+  document.getElementById('query-rows').addEventListener('click', e => {
+    const row = e.target.closest('.query-row');
+    if (!row) return;
+    const id = Number(row.dataset.id);
+
+    if (e.target.closest('.btn-get')) {
+      executeQuery(id);
+    } else if (e.target.closest('.btn-delete-row')) {
+      removeQueryRow(id);
+    }
+  });
+
+  document.getElementById('query-rows').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const input = e.target.closest('.query-input');
+    if (!input) return;
+    const row = input.closest('.query-row');
+    if (!row) return;
+    executeQuery(Number(row.dataset.id));
+  });
+
+  document.getElementById('query-rows').addEventListener('input', e => {
+    const input = e.target.closest('.query-input');
+    if (!input) return;
+    const row = input.closest('.query-row');
+    if (!row) return;
+    const r = queryRows.find(r => r.id === Number(row.dataset.id));
+    if (r) r.freq = input.value;
   });
 });
