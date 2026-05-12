@@ -558,6 +558,7 @@ body {
    Query Result
    ============================================================ */
 .query-row-result:empty { display: none; }
+.query-row-result { overflow-x: auto; }
 
 .result-error {
   font-size: 0.83rem;
@@ -568,10 +569,12 @@ body {
   display: flex;
   gap: 10px;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  width: max-content;
+  min-width: 100%;
 }
 
 .result-item {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 3px;

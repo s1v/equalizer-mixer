@@ -213,8 +213,9 @@ function initChart() {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       onClick(event, _elements, ch) {
-        const pos = Chart.helpers.getRelativePosition(event, ch);
-        const freq = ch.scales.x.getValueForPixel(pos.x);
+        // Chart.js v4: event is ChartEvent, .x/.y are already canvas-relative
+        if (event.x == null) return;
+        const freq = ch.scales.x.getValueForPixel(event.x);
         if (freq && isFinite(freq) && freq > 0) addQueryFromChart(freq);
       },
       plugins: {
