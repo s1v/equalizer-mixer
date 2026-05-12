@@ -453,7 +453,8 @@ body {
 .query-row-form {
   display: flex;
   gap: 8px;
-  align-items: stretch;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .query-input-wrap {
@@ -478,8 +479,8 @@ body {
   font-family: var(--font);
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
-  padding: 9px 12px;
-  width: 130px;
+  padding: 9px 10px;
+  width: 80px;
 }
 
 .query-input::placeholder { color: var(--text-subtle); }
@@ -525,20 +526,22 @@ body {
 }
 
 .btn-delete-row {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: auto;
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid transparent;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-subtle);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
-  padding: 0;
-  margin-left: auto;
+  white-space: nowrap;
+  gap: 5px;
 }
 
 .btn-delete-row:hover {

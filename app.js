@@ -200,9 +200,9 @@ function initChart() {
           pointRadius: 0,
           tension: 0,
           fill: {
-            target: { value: 0 },
-            above: 'rgba(52, 211, 153, 0.06)',
-            below: 'rgba(52, 211, 153, 0.06)',
+            target: 'origin',
+            above: 'rgba(52, 211, 153, 0.05)',
+            below: 'rgba(52, 211, 153, 0.05)',
           },
         },
       ],
@@ -262,11 +262,9 @@ function initChart() {
           min: -24,
           max: 24,
           grid: {
-            color(ctx) {
-              return ctx.tick.value === 0
-                ? 'rgba(255,255,255,0.14)'
-                : 'rgba(255,255,255,0.04)';
-            },
+            color: (ctx) => ctx.tick?.value === 0
+              ? 'rgba(255,255,255,0.14)'
+              : 'rgba(255,255,255,0.04)',
           },
           border: {
             color: 'rgba(255,255,255,0.08)',
@@ -284,6 +282,7 @@ function initChart() {
 }
 
 function updateChart() {
+  if (!chart) return;
   const y1  = interpolateEQ(state.eq1);
   const y2  = interpolateEQ(state.eq2);
   const ym  = y1.map((v, i) => (v + y2[i]) / 2);
@@ -473,10 +472,11 @@ function renderQueryRows() {
           <span class="query-unit">Hz</span>
         </div>
         <button class="btn-primary btn-get">取得</button>
-        <button class="btn-delete-row" aria-label="この行を削除" title="削除">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <button class="btn-delete-row" aria-label="この行を削除">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
+          削除
         </button>
       </div>
       ${resultHTML}
@@ -489,11 +489,10 @@ function renderQueryRows() {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  initChart();
   renderBands('eq1');
   renderBands('eq2');
-  updateChart();
 
+  // イベントリスナーを先に設定し、chart初期化エラーの影響を受けないようにする
   // Add band
   document.getElementById('add-eq1').addEventListener('click', () => addBand('eq1'));
   document.getElementById('add-eq2').addEventListener('click', () => addBand('eq2'));
@@ -549,4 +548,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const r = queryRows.find(r => r.id === Number(row.dataset.id));
     if (r) r.freq = input.value;
   });
+
+  // Chartの初期化はイベントリスナー設定後に行う
+  try {
+    initChart();
+    updateChart();
+  } catch (e) {
+    console.error('Chart initialization failed:', e);
+  }
 });
