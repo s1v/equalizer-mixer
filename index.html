@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equalizer Mixer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <div class="header-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 14 L10 8 L16 18 L22 10 L28 14" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M0 14 L6 10 L12 16 L18 6 L24 12 L28 14" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+        </svg>
+      </div>
+      <h1>Equalizer Mixer</h1>
+      <p class="subtitle">2つのEQ設定をミックスして合成カーブを生成します</p>
+    </header>
+
+    <main class="main">
+
+      <!-- EQ Panels -->
+      <div class="eq-panels">
+
+        <!-- EQ 1 -->
+        <div class="panel eq1" id="panel-eq1">
+          <div class="panel-header">
+            <div class="eq-label">
+              <span class="eq-dot"></span>
+              EQ 1
+            </div>
+            <button class="btn-ghost" id="clear-eq1">クリア</button>
+          </div>
+          <div class="bands-header">
+            <span>周波数</span>
+            <span>ゲイン</span>
+          </div>
+          <div class="band-list" id="bands-eq1"></div>
+          <button class="btn-add" id="add-eq1">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            バンドを追加
+          </button>
+        </div>
+
+        <!-- EQ 2 -->
+        <div class="panel eq2" id="panel-eq2">
+          <div class="panel-header">
+            <div class="eq-label">
+              <span class="eq-dot"></span>
+              EQ 2
+            </div>
+            <button class="btn-ghost" id="clear-eq2">クリア</button>
+          </div>
+          <div class="bands-header">
+            <span>周波数</span>
+            <span>ゲイン</span>
+          </div>
+          <div class="band-list" id="bands-eq2"></div>
+          <button class="btn-add" id="add-eq2">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            バンドを追加
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Chart -->
+      <div class="panel chart-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">ミックスカーブ</h2>
+          <div class="legend">
+            <div class="legend-item eq1-legend">
+              <span class="legend-line dashed"></span>
+              <span>EQ 1</span>
+            </div>
+            <div class="legend-item eq2-legend">
+              <span class="legend-line dashed"></span>
+              <span>EQ 2</span>
+            </div>
+            <div class="legend-item mixed-legend">
+              <span class="legend-line"></span>
+              <span>ミックス</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="eq-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Query -->
+      <div class="panel query-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">ゲインを取得</h2>
+        </div>
+        <div class="query-body">
+          <div class="query-form">
+            <div class="query-input-wrap">
+              <input
+                type="number"
+                id="query-freq"
+                class="query-input"
+                placeholder="1000"
+                min="1"
+                max="96000"
+                step="1"
+                aria-label="周波数 (Hz)"
+              >
+              <span class="query-unit">Hz</span>
+            </div>
+            <button class="btn-primary" id="query-btn">取得</button>
+          </div>
+          <div id="query-result" class="query-result">
+            <span class="result-placeholder">周波数を入力してゲインを取得します</span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,586 @@
+/* ============================================================
+   Reset & Variables
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg:             #080c18;
+  --surface:        rgba(255, 255, 255, 0.04);
+  --surface-hover:  rgba(255, 255, 255, 0.07);
+  --border:         rgba(255, 255, 255, 0.08);
+  --border-active:  rgba(255, 255, 255, 0.16);
+
+  --eq1:        #818cf8;
+  --eq1-dim:    rgba(129, 140, 248, 0.12);
+  --eq1-border: rgba(129, 140, 248, 0.25);
+  --eq2:        #f472b6;
+  --eq2-dim:    rgba(244, 114, 182, 0.12);
+  --eq2-border: rgba(244, 114, 182, 0.25);
+  --mixed:      #34d399;
+  --mixed-dim:  rgba(52, 211, 153, 0.12);
+  --mixed-border: rgba(52, 211, 153, 0.25);
+
+  --text:        #f1f5f9;
+  --text-muted:  #94a3b8;
+  --text-subtle: #475569;
+  --danger:      #f87171;
+  --danger-dim:  rgba(248, 113, 113, 0.1);
+
+  --radius-xl: 20px;
+  --radius-lg: 14px;
+  --radius:    10px;
+  --radius-sm: 7px;
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+html { font-size: 15px; }
+
+body {
+  font-family: var(--font);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   App Layout
+   ============================================================ */
+.app {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 20px 80px;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  padding: 52px 0 44px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(129,140,248,0.15), rgba(244,114,182,0.15));
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  margin-bottom: 4px;
+}
+
+.header h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #c7d2fe 10%, #f9a8d4 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ============================================================
+   Panel (glassmorphism card)
+   ============================================================ */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .panel { backdrop-filter: blur(16px); }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .panel { background: rgba(14, 18, 32, 0.85); }
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.panel-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+/* ============================================================
+   EQ Panels Grid
+   ============================================================ */
+.eq-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 680px) {
+  .eq-panels { grid-template-columns: 1fr; }
+}
+
+/* EQ color accents */
+.eq1 { border-color: rgba(129, 140, 248, 0.18); }
+.eq2 { border-color: rgba(244, 114, 182, 0.18); }
+
+/* ============================================================
+   EQ Label / Badge
+   ============================================================ */
+.eq-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.eq-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.eq1 .eq-dot {
+  background: var(--eq1);
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.6);
+}
+.eq2 .eq-dot {
+  background: var(--eq2);
+  box-shadow: 0 0 10px rgba(244, 114, 182, 0.6);
+}
+
+/* ============================================================
+   Band Column Headers
+   ============================================================ */
+.bands-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 8px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.bands-header span {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subtle);
+}
+
+/* ============================================================
+   Band Rows
+   ============================================================ */
+.band-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+  min-height: 36px;
+}
+
+.band-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Input group with unit suffix */
+.input-group {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.input-group:focus-within {
+  border-color: var(--border-active);
+}
+
+.eq1 .input-group:focus-within { border-color: rgba(129, 140, 248, 0.45); }
+.eq2 .input-group:focus-within { border-color: rgba(244, 114, 182, 0.45); }
+
+.band-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.band-input::placeholder { color: var(--text-subtle); }
+
+/* hide number spinners */
+.band-input::-webkit-inner-spin-button,
+.band-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.band-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+.input-unit {
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-subtle);
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Remove band button */
+.btn-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-remove:hover {
+  color: var(--danger);
+  background: var(--danger-dim);
+  border-color: rgba(248, 113, 113, 0.25);
+}
+
+/* ============================================================
+   Add Band Button
+   ============================================================ */
+.btn-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-add:hover {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  border-color: var(--border-active);
+}
+
+.eq1 .btn-add:hover {
+  border-color: rgba(129, 140, 248, 0.4);
+  color: var(--eq1);
+}
+.eq2 .btn-add:hover {
+  border-color: rgba(244, 114, 182, 0.4);
+  color: var(--eq2);
+}
+
+/* ============================================================
+   Ghost / Clear Button
+   ============================================================ */
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  font-family: var(--font);
+  font-size: 0.73rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-active);
+  color: var(--text-muted);
+  background: var(--surface-hover);
+}
+
+/* ============================================================
+   Chart Panel
+   ============================================================ */
+.chart-panel {
+  margin-bottom: 14px;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 340px;
+}
+
+/* ============================================================
+   Legend
+   ============================================================ */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.legend-line {
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.eq1-legend .legend-line {
+  background: var(--eq1);
+  opacity: 0.8;
+}
+.eq1-legend .legend-line.dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--eq1) 0px,
+    var(--eq1) 5px,
+    transparent 5px,
+    transparent 8px
+  );
+  height: 2px;
+}
+.eq2-legend .legend-line {
+  background: var(--eq2);
+  opacity: 0.8;
+}
+.eq2-legend .legend-line.dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--eq2) 0px,
+    var(--eq2) 5px,
+    transparent 5px,
+    transparent 8px
+  );
+  height: 2px;
+}
+.mixed-legend .legend-line {
+  background: var(--mixed);
+  height: 3px;
+}
+
+/* ============================================================
+   Query Panel
+   ============================================================ */
+.query-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.query-form {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.query-input-wrap {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.query-input-wrap:focus-within {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.query-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  padding: 9px 12px;
+  width: 130px;
+}
+
+.query-input::placeholder { color: var(--text-subtle); }
+.query-input::-webkit-inner-spin-button,
+.query-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.query-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+.query-unit {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-subtle);
+  border-left: 1px solid var(--border);
+  user-select: none;
+}
+
+.btn-primary {
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ============================================================
+   Query Result
+   ============================================================ */
+.query-result {
+  flex: 1;
+  min-width: 200px;
+}
+
+.result-placeholder {
+  font-size: 0.83rem;
+  color: var(--text-subtle);
+}
+
+.result-error {
+  font-size: 0.83rem;
+  color: var(--danger);
+}
+
+.result-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.result-item--eq1 {
+  border-color: var(--eq1-border);
+  background: var(--eq1-dim);
+}
+.result-item--eq2 {
+  border-color: var(--eq2-border);
+  background: var(--eq2-dim);
+}
+.result-item--mixed {
+  border-color: var(--mixed-border);
+  background: var(--mixed-dim);
+}
+
+.result-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.result-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-item--eq1 .result-value { color: var(--eq1); }
+.result-item--eq2 .result-value { color: var(--eq2); }
+.result-item--mixed .result-value { color: var(--mixed); font-size: 1.15rem; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 560px) {
+  .header h1 { font-size: 1.7rem; }
+  .chart-wrap { height: 260px; }
+  .query-body { flex-direction: column; align-items: flex-start; }
+  .query-result { min-width: 0; width: 100%; }
+  .legend { gap: 12px; flex-wrap: wrap; }
+}
