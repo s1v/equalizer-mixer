@@ -212,6 +212,11 @@ function initChart() {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
+      onClick(event, _elements, ch) {
+        const pos = Chart.helpers.getRelativePosition(event, ch);
+        const freq = ch.scales.x.getValueForPixel(pos.x);
+        if (freq && isFinite(freq) && freq > 0) addQueryFromChart(freq);
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -384,6 +389,26 @@ function freqLabel(freq) {
     : `${freq} Hz`;
 }
 
+function addQueryFromChart(rawFreq) {
+  const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, rawFreq));
+  // 有効数字3桁に丸める（例: 1234.5 → 1230, 45.6 → 45.6）
+  const magnitude = Math.pow(10, Math.floor(Math.log10(freq)) - 2);
+  const rounded = Math.round(freq / magnitude) * magnitude;
+
+  const id = nextQueryId++;
+  const g1 = gainAtFreq(state.eq1, rounded);
+  const g2 = gainAtFreq(state.eq2, rounded);
+  queryRows.push({
+    id,
+    freq: String(rounded),
+    result: { g1, g2, gm: (g1 + g2) / 2, fLabel: freqLabel(rounded) },
+  });
+  renderQueryRows();
+
+  const el = document.querySelector(`.query-row[data-id="${id}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function addQueryRow() {
   const id = nextQueryId++;
   queryRows.push({ id, freq: '', result: null });
@@ -472,12 +497,13 @@ function renderQueryRows() {
           <span class="query-unit">Hz</span>
         </div>
         <button class="btn-primary btn-get">取得</button>
+        ${row.result ? `
         <button class="btn-delete-row" aria-label="この行を削除">
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
           削除
-        </button>
+        </button>` : ''}
       </div>
       ${resultHTML}
     `;

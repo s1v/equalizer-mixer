@@ -366,6 +366,10 @@ body {
   height: 340px;
 }
 
+.chart-wrap canvas {
+  cursor: crosshair;
+}
+
 /* ============================================================
    Legend
    ============================================================ */
@@ -563,7 +567,8 @@ body {
 .result-grid {
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .result-item {
