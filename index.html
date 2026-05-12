@@ -103,7 +103,29 @@
         <div class="panel-header">
           <h2 class="panel-title">ゲインを取得</h2>
         </div>
-        <div id="query-rows" class="query-rows"></div>
+        <div id="query-rows" class="query-rows">
+          <div class="query-row" data-id="0">
+            <div class="query-row-form">
+              <div class="query-input-wrap">
+                <input
+                  type="number"
+                  class="query-input"
+                  placeholder="1000"
+                  min="1" max="96000" step="1"
+                  value=""
+                  aria-label="周波数 (Hz)"
+                >
+                <span class="query-unit">Hz</span>
+              </div>
+              <button class="btn-primary btn-get">取得</button>
+              <button class="btn-delete-row" aria-label="この行を削除" title="削除">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
     </main>

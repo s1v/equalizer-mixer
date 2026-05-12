@@ -374,9 +374,10 @@ function clearEQ(eqKey) {
 
 // ─── Query Rows ───────────────────────────────────────────────────────────────
 
-let nextQueryId = 0;
+let nextQueryId = 1;
 // [{ id, freq, result: null | { g1, g2, gm, fLabel } }]
-const queryRows = [];
+// id=0 は index.html に静的に存在する初期行と対応
+const queryRows = [{ id: 0, freq: '', result: null }];
 
 function freqLabel(freq) {
   return freq >= 1000
@@ -492,7 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBands('eq1');
   renderBands('eq2');
   updateChart();
-  addQueryRow();
 
   // Add band
   document.getElementById('add-eq1').addEventListener('click', () => addBand('eq1'));
