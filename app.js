@@ -391,10 +391,7 @@ function freqLabel(freq) {
 }
 
 function addQueryFromChart(rawFreq) {
-  const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, rawFreq));
-  // 有効数字3桁に丸める（例: 1234.5 → 1230, 45.6 → 45.6）
-  const magnitude = Math.pow(10, Math.floor(Math.log10(freq)) - 2);
-  const rounded = Math.round(freq / magnitude) * magnitude;
+  const rounded = Math.round(Math.max(FREQ_MIN, Math.min(FREQ_MAX, rawFreq)));
 
   const id = nextQueryId++;
   const g1 = gainAtFreq(state.eq1, rounded);
@@ -458,34 +455,36 @@ function renderQueryRows() {
     el.className = 'query-row';
     el.dataset.id = row.id;
 
-    let resultHTML = '';
-    if (row.result) {
-      if (row.result.error) {
-        resultHTML = `<div class="query-row-result"><span class="result-error">${row.result.error}</span></div>`;
-      } else {
-        const { g1, g2, gm, fLabel } = row.result;
-        resultHTML = `
-          <div class="query-row-result">
-            <div class="result-grid">
-              <div class="result-item result-item--eq1">
-                <span class="result-label">EQ 1</span>
-                <span class="result-value">${fmt(g1)}</span>
-              </div>
-              <div class="result-item result-item--eq2">
-                <span class="result-label">EQ 2</span>
-                <span class="result-value">${fmt(g2)}</span>
-              </div>
-              <div class="result-item result-item--mixed">
-                <span class="result-label">ミックス @ ${fLabel}</span>
-                <span class="result-value">${fmt(gm)}</span>
-              </div>
-            </div>
-          </div>`;
-      }
-    }
-
-    el.innerHTML = `
-      <div class="query-row-form">
+    if (row.result && !row.result.error) {
+      // 取得済み: カードと削除ボタンのみ（入力欄・取得ボタンなし）
+      const { g1, g2, gm, fLabel } = row.result;
+      el.innerHTML = `
+        <div class="result-cards">
+          <div class="result-item result-item--eq1">
+            <span class="result-label">EQ 1</span>
+            <span class="result-value">${fmt(g1)}</span>
+          </div>
+          <div class="result-item result-item--eq2">
+            <span class="result-label">EQ 2</span>
+            <span class="result-value">${fmt(g2)}</span>
+          </div>
+          <div class="result-item result-item--mixed">
+            <span class="result-label">ミックス @ ${fLabel}</span>
+            <span class="result-value">${fmt(gm)}</span>
+          </div>
+        </div>
+        <button class="btn-delete-row" aria-label="この行を削除">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      `;
+    } else {
+      // 未取得: 入力欄と取得ボタン（削除ボタンなし）
+      const errorHTML = row.result?.error
+        ? `<span class="result-error">${row.result.error}</span>`
+        : '';
+      el.innerHTML = `
         <div class="query-input-wrap">
           <input
             type="number"
@@ -498,16 +497,9 @@ function renderQueryRows() {
           <span class="query-unit">Hz</span>
         </div>
         <button class="btn-primary btn-get">取得</button>
-        ${row.result ? `
-        <button class="btn-delete-row" aria-label="この行を削除">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          削除
-        </button>` : ''}
-      </div>
-      ${resultHTML}
-    `;
+        ${errorHTML}
+      `;
+    }
 
     container.appendChild(el);
   }
