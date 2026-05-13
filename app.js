@@ -6,6 +6,20 @@ const FREQ_MIN   = 20;
 const FREQ_MAX   = 20000;
 const N_POINTS   = 400;
 
+// Foobar2000 標準 EQ (.feq) の18バンド周波数
+const FEQ_FREQS = [
+  65, 92, 131, 185, 262, 370, 523, 740,
+  1047, 1480, 2093, 2960, 4186, 5920,
+  8372, 11840, 16744, 20000,
+];
+
+// XGEQ エクスポート用 ISO 1/3オクターブ バンド（31バンド）
+const XGEQ_EXPORT_FREQS = [
+  20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
+  200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
+  2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000,
+];
+
 // Pre-computed log-spaced frequency array for chart rendering
 const freqPoints = logspace(FREQ_MIN, FREQ_MAX, N_POINTS);
 
@@ -161,6 +175,8 @@ const state = {
     { freq: 8000, gain:  2.0 },
   ],
 };
+
+let decimalPlaces = 2;
 
 // ─── Chart ────────────────────────────────────────────────────────────────────
 
@@ -404,7 +420,8 @@ function removeQueryResult(id) {
 }
 
 function renderQueryResults() {
-  const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + ' dB';
+  const dp  = decimalPlaces;
+  const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(dp) + ' dB';
   const list    = document.getElementById('query-results-list');
   const section = document.getElementById('query-results-section');
 
@@ -462,6 +479,264 @@ function addQueryFromChart(rawFreq) {
   addQueryResult(g1, g2, freqLabel(rounded));
 }
 
+// ─── File Format: FEQ ────────────────────────────────────────────────────────
+
+/**
+ * .feq テキストをパースして {freq, gain}[] を返す
+ * フォーマット: 1行1ゲイン値、18バンド固定
+ */
+function parseFEQ(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const gains = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    const val = parseFloat(trimmed);
+    if (!isFinite(val)) throw new Error(`FEQ: 無効な値 "${trimmed}"`);
+    gains.push(val);
+  }
+  if (gains.length !== 18) {
+    throw new Error(`FEQ: 18バンド必要ですが ${gains.length} バンドが見つかりました`);
+  }
+  return FEQ_FREQS.map((freq, i) => ({ freq, gain: gains[i] }));
+}
+
+/**
+ * ミックスカーブを .feq 形式テキストで生成
+ * FEQ_FREQS の各周波数でミックスゲインを計算し、1行1値で出力
+ */
+function generateFEQ() {
+  const lines = FEQ_FREQS.map(freq => {
+    const g1 = gainAtFreq(state.eq1, freq);
+    const g2 = gainAtFreq(state.eq2, freq);
+    const gm = (g1 + g2) / 2;
+    return gm.toFixed(1);
+  });
+  return lines.join('\n') + '\n';
+}
+
+// ─── File Format: XGEQ ───────────────────────────────────────────────────────
+
+/**
+ * .xgeq バイナリをパースして {freq, gain}[] を返す
+ * フォーマット: "foo_dsp_xgeq\n1\nv:" ヘッダー + float32LE ペア (freq, gain)
+ * バイナリ部の先頭 4バイトが uint32LE のバンド数なら count+pairs 形式、
+ * そうでなければ naked pairs として解釈する
+ */
+function parseXGEQ(buffer) {
+  const bytes = new Uint8Array(buffer);
+
+  // "v:" マーカーを探す (0x76, 0x3A)
+  let dataStart = -1;
+  for (let i = 0; i < bytes.length - 1; i++) {
+    if (bytes[i] === 0x76 && bytes[i + 1] === 0x3A) {
+      dataStart = i + 2;
+      break;
+    }
+  }
+  if (dataStart === -1) throw new Error('XGEQ: "v:" マーカーが見つかりません');
+
+  const remaining = buffer.byteLength - dataStart;
+  if (remaining < 8) throw new Error('XGEQ: データが短すぎます');
+
+  const view = new DataView(buffer, dataStart);
+  const bands = [];
+
+  // まず count-prefix 形式を試みる
+  const maybeCount = view.getUint32(0, true);
+  if (maybeCount > 0 && maybeCount <= 2048 && 4 + maybeCount * 8 <= remaining) {
+    for (let i = 0; i < maybeCount; i++) {
+      const freq = view.getFloat32(4 + i * 8, true);
+      const gain = view.getFloat32(4 + i * 8 + 4, true);
+      if (isFinite(freq) && isFinite(gain) && freq >= 10 && freq <= 30000 && Math.abs(gain) <= 120) {
+        bands.push({ freq: Math.round(freq * 10) / 10, gain: Math.round(gain * 100) / 100 });
+      }
+    }
+    if (bands.length > 0) return bands;
+  }
+
+  // フォールバック: naked float32 pairs
+  const pairCount = Math.floor(remaining / 8);
+  for (let i = 0; i < pairCount; i++) {
+    const freq = view.getFloat32(i * 8, true);
+    const gain = view.getFloat32(i * 8 + 4, true);
+    if (isFinite(freq) && isFinite(gain) && freq >= 10 && freq <= 30000 && Math.abs(gain) <= 120) {
+      bands.push({ freq: Math.round(freq * 10) / 10, gain: Math.round(gain * 100) / 100 });
+    }
+  }
+
+  if (bands.length === 0) throw new Error('XGEQ: 有効なバンドデータが見つかりません');
+  return bands;
+}
+
+/**
+ * ミックスカーブを .xgeq バイナリで生成
+ * フォーマット: "foo_dsp_xgeq\n1\nv:" + uint32LE(count) + N*(float32LE freq, float32LE gain)
+ */
+function generateXGEQ() {
+  const freqs = XGEQ_EXPORT_FREQS;
+  const n = freqs.length;
+
+  const headerStr = 'foo_dsp_xgeq\n1\nv:';
+  const headerBytes = new TextEncoder().encode(headerStr);
+
+  // uint32 count + n * (float32 freq + float32 gain)
+  const binBuffer = new ArrayBuffer(4 + n * 8);
+  const view = new DataView(binBuffer);
+  view.setUint32(0, n, true); // LE
+  for (let i = 0; i < n; i++) {
+    const freq = freqs[i];
+    const g1   = gainAtFreq(state.eq1, freq);
+    const g2   = gainAtFreq(state.eq2, freq);
+    const gain = (g1 + g2) / 2;
+    view.setFloat32(4 + i * 8,     freq, true);
+    view.setFloat32(4 + i * 8 + 4, gain, true);
+  }
+
+  const combined = new Uint8Array(headerBytes.length + binBuffer.byteLength);
+  combined.set(headerBytes, 0);
+  combined.set(new Uint8Array(binBuffer), headerBytes.length);
+  return combined;
+}
+
+// ─── File Download Helper ─────────────────────────────────────────────────────
+
+function downloadFile(filename, data) {
+  const blob = data instanceof Uint8Array
+    ? new Blob([data], { type: 'application/octet-stream' })
+    : new Blob([data], { type: 'text/plain; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+const modalState = {
+  mode:   null, // 'import' | 'export'
+  target: null, // 'eq1' | 'eq2' (importのみ)
+};
+
+function openModal(mode, target) {
+  modalState.mode   = mode;
+  modalState.target = target || null;
+
+  const overlay    = document.getElementById('modal-overlay');
+  const title      = document.getElementById('modal-title');
+  const fileField  = document.getElementById('modal-file-field');
+  const fileInput  = document.getElementById('modal-file-input');
+  const errorEl    = document.getElementById('modal-error');
+  const confirmBtn = document.getElementById('modal-confirm');
+
+  // タイトル
+  if (mode === 'import') {
+    title.textContent = `インポート（${target === 'eq1' ? 'EQ 1' : 'EQ 2'}）`;
+    fileField.hidden  = false;
+    confirmBtn.textContent = 'インポート';
+  } else {
+    title.textContent = 'エクスポート（ミックスカーブ）';
+    fileField.hidden  = true;
+    confirmBtn.textContent = 'ダウンロード';
+  }
+
+  // リセット
+  fileInput.value = '';
+  errorEl.hidden  = true;
+  errorEl.textContent = '';
+
+  // format ラジオを feq に戻す
+  const radios = overlay.querySelectorAll('input[name="modal-format"]');
+  radios.forEach(r => { r.checked = r.value === 'feq'; });
+
+  overlay.hidden = false;
+  // アクセシビリティ: フォーカスをモーダルに移動
+  document.getElementById('modal-close').focus();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').hidden = true;
+  modalState.mode   = null;
+  modalState.target = null;
+}
+
+function getSelectedFormat() {
+  const checked = document.querySelector('input[name="modal-format"]:checked');
+  return checked ? checked.value : 'feq';
+}
+
+function showModalError(msg) {
+  const errorEl = document.getElementById('modal-error');
+  errorEl.textContent = msg;
+  errorEl.hidden = false;
+}
+
+function handleModalConfirm() {
+  const format = getSelectedFormat();
+
+  if (modalState.mode === 'export') {
+    // ─ エクスポート ─
+    try {
+      if (format === 'feq') {
+        const text = generateFEQ();
+        downloadFile('mixed_eq.feq', text);
+      } else {
+        const bytes = generateXGEQ();
+        downloadFile('mixed_eq.xgeq', bytes);
+      }
+      closeModal();
+    } catch (e) {
+      showModalError(`エクスポートエラー: ${e.message}`);
+    }
+
+  } else if (modalState.mode === 'import') {
+    // ─ インポート ─
+    const fileInput = document.getElementById('modal-file-input');
+    const file = fileInput.files[0];
+    if (!file) {
+      showModalError('ファイルを選択してください');
+      return;
+    }
+
+    const eqKey = modalState.target;
+
+    if (format === 'feq') {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const bands = parseFEQ(e.target.result);
+          state[eqKey] = bands;
+          renderBands(eqKey);
+          updateChart();
+          closeModal();
+        } catch (err) {
+          showModalError(err.message);
+        }
+      };
+      reader.onerror = () => showModalError('ファイルの読み込みに失敗しました');
+      reader.readAsText(file);
+
+    } else {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const bands = parseXGEQ(e.target.result);
+          state[eqKey] = bands;
+          renderBands(eqKey);
+          updateChart();
+          closeModal();
+        } catch (err) {
+          showModalError(err.message);
+        }
+      };
+      reader.onerror = () => showModalError('ファイルの読み込みに失敗しました');
+      reader.readAsArrayBuffer(file);
+    }
+  }
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -469,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBands('eq2');
 
   // イベントリスナーを先に設定し、chart初期化エラーの影響を受けないようにする
+
   // Add band
   document.getElementById('add-eq1').addEventListener('click', () => addBand('eq1'));
   document.getElementById('add-eq2').addEventListener('click', () => addBand('eq2'));
@@ -476,6 +752,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear
   document.getElementById('clear-eq1').addEventListener('click', () => clearEQ('eq1'));
   document.getElementById('clear-eq2').addEventListener('click', () => clearEQ('eq2'));
+
+  // Import
+  document.getElementById('import-eq1').addEventListener('click', () => openModal('import', 'eq1'));
+  document.getElementById('import-eq2').addEventListener('click', () => openModal('import', 'eq2'));
+
+  // Export
+  document.getElementById('export-btn').addEventListener('click', () => openModal('export'));
 
   // Input / remove — event delegation per band-list container
   for (const eqKey of ['eq1', 'eq2']) {
@@ -506,6 +789,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!btn) return;
     const row = btn.closest('.result-row');
     if (row) removeQueryResult(Number(row.dataset.id));
+  });
+
+  // 小数点桁数
+  document.getElementById('decimal-places').addEventListener('change', e => {
+    decimalPlaces = Number(e.target.value);
+    renderQueryResults();
+  });
+
+  // Modal: 閉じる / キャンセル / 確定 / オーバーレイクリック
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-confirm').addEventListener('click', handleModalConfirm);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  // Escape キーで閉じる
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !document.getElementById('modal-overlay').hidden) {
+      closeModal();
+    }
+  });
+
+  // format ラジオ切替でファイル入力の accept を更新
+  document.querySelectorAll('input[name="modal-format"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const fmt = getSelectedFormat();
+      const fileInput = document.getElementById('modal-file-input');
+      fileInput.accept = fmt === 'feq' ? '.feq' : '.xgeq';
+      // エラー表示をリセット
+      const errorEl = document.getElementById('modal-error');
+      errorEl.hidden = true;
+    });
   });
 
   // Chartの初期化はイベントリスナー設定後に行う

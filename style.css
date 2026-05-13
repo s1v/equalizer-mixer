@@ -140,6 +140,16 @@ body {
 }
 
 /* ============================================================
+   Header Actions (button group in panel-header)
+   ============================================================ */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
    EQ Panels Grid
    ============================================================ */
 .eq-panels {
@@ -346,12 +356,59 @@ body {
   padding: 4px 10px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .btn-ghost:hover {
   border-color: var(--border-active);
   color: var(--text-muted);
   background: var(--surface-hover);
+}
+
+/* ============================================================
+   Decimal Places Select
+   ============================================================ */
+.decimal-label {
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.select-decimal {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.73rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  /* Custom arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23475569' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  padding-right: 24px;
+}
+
+.select-decimal:hover {
+  border-color: var(--border-active);
+  color: var(--text);
+}
+
+.select-decimal:focus {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.select-decimal option {
+  background: #0f1422;
+  color: var(--text);
 }
 
 /* ============================================================
@@ -636,12 +693,196 @@ body {
 .result-item--mixed .result-value { color: var(--mixed); font-size: 1.15rem; }
 
 /* ============================================================
+   Modal
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: overlay-in 0.15s ease;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  background: #0f1422;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  max-width: 420px;
+  animation: modal-in 0.18s ease;
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 22px 0;
+}
+
+.modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  color: var(--text-muted);
+  background: var(--surface-hover);
+  border-color: var(--border-active);
+}
+
+.modal-body {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-field-label {
+  font-size: 0.73rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subtle);
+}
+
+.modal-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.modal-radio-label:hover {
+  border-color: var(--border-active);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.modal-radio-label input[type="radio"] {
+  accent-color: var(--mixed);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.modal-radio-label:has(input:checked) {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.06);
+  color: var(--text);
+}
+
+.modal-file-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  padding: 8px 10px;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.modal-file-input:hover {
+  border-color: var(--border-active);
+}
+
+.modal-file-input::file-selector-button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  margin-right: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-file-input::file-selector-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.modal-error {
+  font-size: 0.8rem;
+  color: var(--danger);
+  background: var(--danger-dim);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 22px 20px;
+}
+
+/* ============================================================
    Responsive
    ============================================================ */
 @media (max-width: 560px) {
   .header h1 { font-size: 1.7rem; }
   .chart-wrap { height: 260px; }
-  .query-body { flex-direction: column; align-items: flex-start; }
-  .query-result { min-width: 0; width: 100%; }
   .legend { gap: 12px; flex-wrap: wrap; }
+  .header-actions { gap: 4px; }
+  .query-form-row { flex-wrap: wrap; }
 }

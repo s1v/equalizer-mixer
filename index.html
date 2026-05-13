@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div class="app">
@@ -35,7 +35,10 @@
               <span class="eq-dot"></span>
               EQ 1
             </div>
-            <button class="btn-ghost" id="clear-eq1">クリア</button>
+            <div class="header-actions">
+              <button class="btn-ghost" id="import-eq1">インポート</button>
+              <button class="btn-ghost" id="clear-eq1">クリア</button>
+            </div>
           </div>
           <div class="bands-header">
             <span>周波数</span>
@@ -57,7 +60,10 @@
               <span class="eq-dot"></span>
               EQ 2
             </div>
-            <button class="btn-ghost" id="clear-eq2">クリア</button>
+            <div class="header-actions">
+              <button class="btn-ghost" id="import-eq2">インポート</button>
+              <button class="btn-ghost" id="clear-eq2">クリア</button>
+            </div>
           </div>
           <div class="bands-header">
             <span>周波数</span>
@@ -102,6 +108,15 @@
       <div class="panel query-panel">
         <div class="panel-header">
           <h2 class="panel-title">ゲインを取得</h2>
+          <div class="header-actions">
+            <label class="decimal-label" for="decimal-places">小数点</label>
+            <select id="decimal-places" class="select-decimal">
+              <option value="0">0桁</option>
+              <option value="1">1桁</option>
+              <option value="2" selected>2桁</option>
+              <option value="3">3桁</option>
+            </select>
+          </div>
         </div>
         <!-- 入力フォーム（常に最上部） -->
         <div class="query-form-row">
@@ -117,6 +132,7 @@
             <span class="query-unit">Hz</span>
           </div>
           <button class="btn-primary" id="query-submit-btn">取得</button>
+          <button class="btn-ghost" id="export-btn">エクスポート</button>
         </div>
         <!-- 取得結果（1件以上あるとき表示） -->
         <div id="query-results-section" hidden>
@@ -128,7 +144,45 @@
     </main>
   </div>
 
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-title">インポート</h3>
+        <button class="modal-close" id="modal-close" aria-label="閉じる">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <p class="modal-field-label">ファイル形式</p>
+          <div class="modal-radios">
+            <label class="modal-radio-label">
+              <input type="radio" name="modal-format" value="feq" checked>
+              <span>.feq（Foobar2000 標準 EQ）</span>
+            </label>
+            <label class="modal-radio-label">
+              <input type="radio" name="modal-format" value="xgeq">
+              <span>.xgeq（Foobar2000 GraphicEQ）</span>
+            </label>
+          </div>
+        </div>
+        <div id="modal-file-field" class="modal-field">
+          <label class="modal-field-label" for="modal-file-input">ファイル</label>
+          <input type="file" id="modal-file-input" class="modal-file-input" accept=".feq,.xgeq">
+        </div>
+        <p id="modal-error" class="modal-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="modal-cancel">キャンセル</button>
+        <button class="btn-primary" id="modal-confirm">実行</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
