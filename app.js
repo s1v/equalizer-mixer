@@ -519,7 +519,11 @@ function generateFEQ() {
 
 /**
  * .xgeq バイナリをパースして {freq, gain}[] を返す
- * 複数の戦略を試みて最良の結果を返す
+ *
+ * 実測フォーマット（Foobar2000 GraphicEQ）:
+ *   ヘッダー "foo_dsp_xgeq\r\n1\r\nv:" の後にバイナリが続く
+ *   バイナリ内に uint32 LE のバンド数 (18 or 31) があり、
+ *   直後に N × int32 LE でゲイン × 100 が格納される (例: 760 → 7.60 dB)
  */
 function parseXGEQ(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -534,177 +538,104 @@ function parseXGEQ(buffer) {
   }
   if (dataStart === -1) throw new Error('XGEQ: "v:" マーカーが見つかりません');
 
-  // デバッグ: コンソールにhexダンプ
-  const hexDump = Array.from(bytes.slice(dataStart, Math.min(dataStart + 96, bytes.length)))
-    .map(b => b.toString(16).padStart(2, '0')).join(' ');
-  console.log('[XGEQ] total bytes:', buffer.byteLength, '/ after v::', buffer.byteLength - dataStart);
-  console.log('[XGEQ] hex after v::', hexDump);
-
   const view = new DataView(buffer);
-  let bestBands = [];
 
-  const isValidFreq = f => isFinite(f) && f >= 10 && f <= 30000;
-  const isValidGain = g => isFinite(g) && Math.abs(g) <= 120;
-  const makeBand    = (f, g) => ({ freq: Math.round(f * 10) / 10, gain: Math.round(g * 100) / 100 });
-  const tryUpdate   = arr => { if (arr.length > bestBands.length) bestBands = arr; };
-
-  // ── 戦略 A: float32 ペア (freq, gain) ── オフセット 0-20、LE/BE ──
-  for (let extra = 0; extra <= 20; extra++) {
-    const off = dataStart + extra;
-    if (off + 8 > buffer.byteLength) break;
-    for (const le of [true, false]) {
-      const n = Math.floor((buffer.byteLength - off) / 8);
-      const bands = [];
-      for (let i = 0; i < n; i++) {
-        const freq = view.getFloat32(off + i * 8,     le);
-        const gain = view.getFloat32(off + i * 8 + 4, le);
-        if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
-      }
-      if (bands.length > 0) {
-        console.log(`[XGEQ] A float32-pairs extra=${extra} le=${le}:`, bands.length, 'bands', bands[0]);
-        tryUpdate(bands);
-      }
-    }
-  }
-
-  // ── 戦略 B: uint32カウント + float32 ペア ── オフセット 0-12、LE/BE ──
-  for (let extra = 0; extra <= 12; extra++) {
-    const off = dataStart + extra;
-    if (off + 4 > buffer.byteLength) break;
-    for (const le of [true, false]) {
-      const count = view.getUint32(off, le);
-      if (count > 0 && count <= 512 && off + 4 + count * 8 <= buffer.byteLength) {
-        const bands = [];
-        for (let i = 0; i < count; i++) {
-          const freq = view.getFloat32(off + 4 + i * 8,     le);
-          const gain = view.getFloat32(off + 4 + i * 8 + 4, le);
-          if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
-        }
-        if (bands.length > 0) {
-          console.log(`[XGEQ] B count+float32 extra=${extra} le=${le} count=${count}:`, bands.length);
-          tryUpdate(bands);
-        }
-      }
-    }
-  }
-
-  // ── 戦略 C: float64 ペア ── オフセット 0-8、LE ──
-  for (let extra = 0; extra <= 8; extra++) {
-    const off = dataStart + extra;
-    if (off + 16 > buffer.byteLength) break;
-    const n = Math.floor((buffer.byteLength - off) / 16);
-    const bands = [];
-    for (let i = 0; i < n; i++) {
-      const freq = view.getFloat64(off + i * 16,     true);
-      const gain = view.getFloat64(off + i * 16 + 8, true);
-      if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
-    }
-    if (bands.length > 0) {
-      console.log(`[XGEQ] C float64-pairs extra=${extra}:`, bands.length, bands[0]);
-      tryUpdate(bands);
-    }
-  }
-
-  // ── 戦略 D: uint32カウント + float64 ペア ─────────────────────────────
-  for (let extra = 0; extra <= 8; extra++) {
-    const off = dataStart + extra;
-    if (off + 4 > buffer.byteLength) break;
-    for (const le of [true, false]) {
-      const count = view.getUint32(off, le);
-      if (count > 0 && count <= 256 && off + 4 + count * 16 <= buffer.byteLength) {
-        const bands = [];
-        for (let i = 0; i < count; i++) {
-          const freq = view.getFloat64(off + 4 + i * 16,     le);
-          const gain = view.getFloat64(off + 4 + i * 16 + 8, le);
-          if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
-        }
-        if (bands.length > 0) {
-          console.log(`[XGEQ] D count+float64 extra=${extra} le=${le} count=${count}:`, bands.length);
-          tryUpdate(bands);
-        }
-      }
-    }
-  }
-
-  // ── 戦略 E: ゲインのみ固定周波数 ─────────────────────────────────────
-  // XGEQ_EXPORT_FREQS (31バンド) → FEQ_FREQS (18バンド) の順で試みる
-  const gainOnlyDefs = [
+  const BAND_DEFS = [
     { n: XGEQ_EXPORT_FREQS.length, freqs: XGEQ_EXPORT_FREQS },
     { n: FEQ_FREQS.length,         freqs: FEQ_FREQS         },
   ];
-  for (const { n, freqs } of gainOnlyDefs) {
-    for (let extra = 0; extra <= 16; extra++) {
-      const off = dataStart + extra;
-      if (off + n * 4 > buffer.byteLength) break;
-      const bands = [];
-      let valid = true;
-      for (let i = 0; i < n; i++) {
-        const gain = view.getFloat32(off + i * 4, true);
-        if (isValidGain(gain)) {
-          bands.push({ freq: freqs[i], gain: Math.round(gain * 100) / 100 });
-        } else {
-          valid = false; break;
-        }
-      }
-      if (valid && bands.length === n) {
-        console.log(`[XGEQ] E gains-only-${n} extra=${extra}:`, bands.slice(0, 3));
-        tryUpdate(bands);
+
+  // ── 主戦略: uint32 LE カウント + N × int32 LE (gain × 100) ──────────
+  // バイト列を走査してバンド数らしい uint32 を探し、
+  // 直後の N 個の int32 がすべて有効なゲイン範囲 (±12000) に収まるか確認する
+  for (let extra = 0; extra <= 60; extra++) {
+    const off = dataStart + extra;
+    if (off + 4 > buffer.byteLength) break;
+    const count = view.getUint32(off, true);
+    const def = BAND_DEFS.find(d => d.n === count);
+    if (!def) continue;
+    if (off + 4 + count * 4 > buffer.byteLength) continue;
+
+    const bands = [];
+    let valid = true;
+    for (let i = 0; i < count; i++) {
+      const raw  = view.getInt32(off + 4 + i * 4, true); // gain × 100
+      const gain = raw / 100;
+      if (isFinite(gain) && Math.abs(gain) <= 120) {
+        bands.push({ freq: def.freqs[i], gain: Math.round(gain * 100) / 100 });
+      } else {
+        valid = false; break;
       }
     }
-    // カウントプレフィックス付き (uint32 LE = n)
-    for (let extra = 0; extra <= 16; extra++) {
-      const off = dataStart + extra;
-      if (off + 4 + n * 4 > buffer.byteLength) break;
-      const count = view.getUint32(off, true);
-      if (count !== n) continue;
-      const bands = [];
-      let valid = true;
-      for (let i = 0; i < n; i++) {
-        const gain = view.getFloat32(off + 4 + i * 4, true);
-        if (isValidGain(gain)) {
-          bands.push({ freq: freqs[i], gain: Math.round(gain * 100) / 100 });
-        } else {
-          valid = false; break;
-        }
-      }
-      if (valid && bands.length === n) {
-        console.log(`[XGEQ] F count+gains-${n} extra=${extra}:`, bands.slice(0, 3));
-        tryUpdate(bands);
-      }
+    if (valid && bands.length === count) {
+      console.log(`[XGEQ] int32×100 count=${count} extra=${extra}:`, bands.slice(0, 4));
+      return bands; // 最初に見つかった有効なブロックを採用
     }
   }
 
-  if (bestBands.length > 0) return bestBands;
-  throw new Error('XGEQ: 有効なバンドデータが見つかりません（F12キー→コンソールタブで [XGEQ] を確認してください）');
+  throw new Error('XGEQ: 有効なバンドデータが見つかりません');
 }
 
 /**
  * ミックスカーブを .xgeq バイナリで生成
- * フォーマット: "foo_dsp_xgeq\n1\nv:" + uint32LE(count) + N*(float32LE freq, float32LE gain)
+ * フォーマット: "foo_dsp_xgeq\r\n1\r\nv:" + preamble + uint32LE(count) + N×int32LE(gain×100)
+ * ※ L/R 同一内容を 2 ブロック出力 (Foobar2000 Stereo 形式)
  */
 function generateXGEQ() {
   const freqs = XGEQ_EXPORT_FREQS;
-  const n = freqs.length;
+  const n = freqs.length; // 31
 
-  const headerStr = 'foo_dsp_xgeq\n1\nv:';
+  // ゲイン計算 (int32 × 100)
+  const gains = freqs.map(freq => {
+    const g1 = gainAtFreq(state.eq1, freq);
+    const g2 = gainAtFreq(state.eq2, freq);
+    return Math.round(((g1 + g2) / 2) * 100);
+  });
+
+  // ヘッダー文字列 (CRLF)
+  const headerStr   = 'foo_dsp_xgeq\r\n1\r\nv:';
   const headerBytes = new TextEncoder().encode(headerStr);
 
-  // uint32 count + n * (float32 freq + float32 gain)
-  const binBuffer = new ArrayBuffer(4 + n * 8);
-  const view = new DataView(binBuffer);
-  view.setUint32(0, n, true); // LE
-  for (let i = 0; i < n; i++) {
-    const freq = freqs[i];
-    const g1   = gainAtFreq(state.eq1, freq);
-    const g2   = gainAtFreq(state.eq2, freq);
-    const gain = (g1 + g2) / 2;
-    view.setFloat32(4 + i * 8,     freq, true);
-    view.setFloat32(4 + i * 8 + 4, gain, true);
-  }
+  // 1 チャンネル分のバイナリ構造:
+  //   [0x0C] [14 bytes filler] [4 bytes:0x01000000] [4 bytes:0x00000003]
+  //   [4 bytes:0x00000001]   [4 bytes:0x00000002]   [int32 volume=0]
+  //   [0x01] [uint32 count]  [N × int32 gains]
+  //
+  // preamble = 0x0C + 14 filler + 4+4+4+4 = 1+14+16 = 31 bytes
+  // volume(4) + 0x01(1) + count(4) = 9 bytes
+  // total before gains = 31 + 9 = 40 bytes per block
+  const BLOCK_BEFORE_GAINS = 40;
+  const blockSize = BLOCK_BEFORE_GAINS + n * 4;
 
-  const combined = new Uint8Array(headerBytes.length + binBuffer.byteLength);
+  const buildBlock = (gainArr) => {
+    const buf  = new ArrayBuffer(blockSize);
+    const view = new DataView(buf);
+    let pos = 0;
+    // preamble
+    view.setUint8(pos++, 0x0C);
+    for (let i = 0; i < 14; i++) view.setUint8(pos++, 0x00); // filler
+    view.setUint32(pos, 1, true);  pos += 4;
+    view.setUint32(pos, 3, true);  pos += 4;
+    view.setUint32(pos, 1, true);  pos += 4;
+    view.setUint32(pos, 2, true);  pos += 4;
+    // volume = 0
+    view.setInt32(pos, 0, true);   pos += 4;
+    // channel flag
+    view.setUint8(pos++, 0x01);
+    // band count
+    view.setUint32(pos, n, true);  pos += 4;
+    // gains
+    for (let i = 0; i < n; i++) {
+      view.setInt32(pos, gainArr[i], true); pos += 4;
+    }
+    return new Uint8Array(buf);
+  };
+
+  const block   = buildBlock(gains);
+  const combined = new Uint8Array(headerBytes.length + block.length * 2);
   combined.set(headerBytes, 0);
-  combined.set(new Uint8Array(binBuffer), headerBytes.length);
+  combined.set(block, headerBytes.length);
+  combined.set(block, headerBytes.length + block.length); // L/R 同一
   return combined;
 }
 
