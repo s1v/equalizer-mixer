@@ -626,18 +626,51 @@ function parseXGEQ(buffer) {
     }
   }
 
-  // ── 戦略 E: ゲインのみ float32 (固定周波数 FEQ_FREQS 18バンド) ─────────
-  for (let extra = 0; extra <= 12; extra++) {
-    const off = dataStart + extra;
-    if (off + 18 * 4 > buffer.byteLength) break;
-    const bands = [];
-    for (let i = 0; i < 18; i++) {
-      const gain = view.getFloat32(off + i * 4, true);
-      if (isValidGain(gain)) bands.push({ freq: FEQ_FREQS[i], gain: Math.round(gain * 100) / 100 });
+  // ── 戦略 E: ゲインのみ固定周波数 ─────────────────────────────────────
+  // XGEQ_EXPORT_FREQS (31バンド) → FEQ_FREQS (18バンド) の順で試みる
+  const gainOnlyDefs = [
+    { n: XGEQ_EXPORT_FREQS.length, freqs: XGEQ_EXPORT_FREQS },
+    { n: FEQ_FREQS.length,         freqs: FEQ_FREQS         },
+  ];
+  for (const { n, freqs } of gainOnlyDefs) {
+    for (let extra = 0; extra <= 16; extra++) {
+      const off = dataStart + extra;
+      if (off + n * 4 > buffer.byteLength) break;
+      const bands = [];
+      let valid = true;
+      for (let i = 0; i < n; i++) {
+        const gain = view.getFloat32(off + i * 4, true);
+        if (isValidGain(gain)) {
+          bands.push({ freq: freqs[i], gain: Math.round(gain * 100) / 100 });
+        } else {
+          valid = false; break;
+        }
+      }
+      if (valid && bands.length === n) {
+        console.log(`[XGEQ] E gains-only-${n} extra=${extra}:`, bands.slice(0, 3));
+        tryUpdate(bands);
+      }
     }
-    if (bands.length === 18) {
-      console.log(`[XGEQ] E gains-only-18 extra=${extra}:`, bands.slice(0, 3));
-      tryUpdate(bands);
+    // カウントプレフィックス付き (uint32 LE = n)
+    for (let extra = 0; extra <= 16; extra++) {
+      const off = dataStart + extra;
+      if (off + 4 + n * 4 > buffer.byteLength) break;
+      const count = view.getUint32(off, true);
+      if (count !== n) continue;
+      const bands = [];
+      let valid = true;
+      for (let i = 0; i < n; i++) {
+        const gain = view.getFloat32(off + 4 + i * 4, true);
+        if (isValidGain(gain)) {
+          bands.push({ freq: freqs[i], gain: Math.round(gain * 100) / 100 });
+        } else {
+          valid = false; break;
+        }
+      }
+      if (valid && bands.length === n) {
+        console.log(`[XGEQ] F count+gains-${n} extra=${extra}:`, bands.slice(0, 3));
+        tryUpdate(bands);
+      }
     }
   }
 
