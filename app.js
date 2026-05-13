@@ -519,9 +519,7 @@ function generateFEQ() {
 
 /**
  * .xgeq バイナリをパースして {freq, gain}[] を返す
- * フォーマット: "foo_dsp_xgeq\n1\nv:" ヘッダー + float32LE ペア (freq, gain)
- * バイナリ部の先頭 4バイトが uint32LE のバンド数なら count+pairs 形式、
- * そうでなければ naked pairs として解釈する
+ * 複数の戦略を試みて最良の結果を返す
  */
 function parseXGEQ(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -536,37 +534,115 @@ function parseXGEQ(buffer) {
   }
   if (dataStart === -1) throw new Error('XGEQ: "v:" マーカーが見つかりません');
 
-  const remaining = buffer.byteLength - dataStart;
-  if (remaining < 8) throw new Error('XGEQ: データが短すぎます');
+  // デバッグ: コンソールにhexダンプ
+  const hexDump = Array.from(bytes.slice(dataStart, Math.min(dataStart + 96, bytes.length)))
+    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  console.log('[XGEQ] total bytes:', buffer.byteLength, '/ after v::', buffer.byteLength - dataStart);
+  console.log('[XGEQ] hex after v::', hexDump);
 
-  const view = new DataView(buffer, dataStart);
-  const bands = [];
+  const view = new DataView(buffer);
+  let bestBands = [];
 
-  // まず count-prefix 形式を試みる
-  const maybeCount = view.getUint32(0, true);
-  if (maybeCount > 0 && maybeCount <= 2048 && 4 + maybeCount * 8 <= remaining) {
-    for (let i = 0; i < maybeCount; i++) {
-      const freq = view.getFloat32(4 + i * 8, true);
-      const gain = view.getFloat32(4 + i * 8 + 4, true);
-      if (isFinite(freq) && isFinite(gain) && freq >= 10 && freq <= 30000 && Math.abs(gain) <= 120) {
-        bands.push({ freq: Math.round(freq * 10) / 10, gain: Math.round(gain * 100) / 100 });
+  const isValidFreq = f => isFinite(f) && f >= 10 && f <= 30000;
+  const isValidGain = g => isFinite(g) && Math.abs(g) <= 120;
+  const makeBand    = (f, g) => ({ freq: Math.round(f * 10) / 10, gain: Math.round(g * 100) / 100 });
+  const tryUpdate   = arr => { if (arr.length > bestBands.length) bestBands = arr; };
+
+  // ── 戦略 A: float32 ペア (freq, gain) ── オフセット 0-20、LE/BE ──
+  for (let extra = 0; extra <= 20; extra++) {
+    const off = dataStart + extra;
+    if (off + 8 > buffer.byteLength) break;
+    for (const le of [true, false]) {
+      const n = Math.floor((buffer.byteLength - off) / 8);
+      const bands = [];
+      for (let i = 0; i < n; i++) {
+        const freq = view.getFloat32(off + i * 8,     le);
+        const gain = view.getFloat32(off + i * 8 + 4, le);
+        if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
+      }
+      if (bands.length > 0) {
+        console.log(`[XGEQ] A float32-pairs extra=${extra} le=${le}:`, bands.length, 'bands', bands[0]);
+        tryUpdate(bands);
       }
     }
-    if (bands.length > 0) return bands;
   }
 
-  // フォールバック: naked float32 pairs
-  const pairCount = Math.floor(remaining / 8);
-  for (let i = 0; i < pairCount; i++) {
-    const freq = view.getFloat32(i * 8, true);
-    const gain = view.getFloat32(i * 8 + 4, true);
-    if (isFinite(freq) && isFinite(gain) && freq >= 10 && freq <= 30000 && Math.abs(gain) <= 120) {
-      bands.push({ freq: Math.round(freq * 10) / 10, gain: Math.round(gain * 100) / 100 });
+  // ── 戦略 B: uint32カウント + float32 ペア ── オフセット 0-12、LE/BE ──
+  for (let extra = 0; extra <= 12; extra++) {
+    const off = dataStart + extra;
+    if (off + 4 > buffer.byteLength) break;
+    for (const le of [true, false]) {
+      const count = view.getUint32(off, le);
+      if (count > 0 && count <= 512 && off + 4 + count * 8 <= buffer.byteLength) {
+        const bands = [];
+        for (let i = 0; i < count; i++) {
+          const freq = view.getFloat32(off + 4 + i * 8,     le);
+          const gain = view.getFloat32(off + 4 + i * 8 + 4, le);
+          if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
+        }
+        if (bands.length > 0) {
+          console.log(`[XGEQ] B count+float32 extra=${extra} le=${le} count=${count}:`, bands.length);
+          tryUpdate(bands);
+        }
+      }
     }
   }
 
-  if (bands.length === 0) throw new Error('XGEQ: 有効なバンドデータが見つかりません');
-  return bands;
+  // ── 戦略 C: float64 ペア ── オフセット 0-8、LE ──
+  for (let extra = 0; extra <= 8; extra++) {
+    const off = dataStart + extra;
+    if (off + 16 > buffer.byteLength) break;
+    const n = Math.floor((buffer.byteLength - off) / 16);
+    const bands = [];
+    for (let i = 0; i < n; i++) {
+      const freq = view.getFloat64(off + i * 16,     true);
+      const gain = view.getFloat64(off + i * 16 + 8, true);
+      if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
+    }
+    if (bands.length > 0) {
+      console.log(`[XGEQ] C float64-pairs extra=${extra}:`, bands.length, bands[0]);
+      tryUpdate(bands);
+    }
+  }
+
+  // ── 戦略 D: uint32カウント + float64 ペア ─────────────────────────────
+  for (let extra = 0; extra <= 8; extra++) {
+    const off = dataStart + extra;
+    if (off + 4 > buffer.byteLength) break;
+    for (const le of [true, false]) {
+      const count = view.getUint32(off, le);
+      if (count > 0 && count <= 256 && off + 4 + count * 16 <= buffer.byteLength) {
+        const bands = [];
+        for (let i = 0; i < count; i++) {
+          const freq = view.getFloat64(off + 4 + i * 16,     le);
+          const gain = view.getFloat64(off + 4 + i * 16 + 8, le);
+          if (isValidFreq(freq) && isValidGain(gain)) bands.push(makeBand(freq, gain));
+        }
+        if (bands.length > 0) {
+          console.log(`[XGEQ] D count+float64 extra=${extra} le=${le} count=${count}:`, bands.length);
+          tryUpdate(bands);
+        }
+      }
+    }
+  }
+
+  // ── 戦略 E: ゲインのみ float32 (固定周波数 FEQ_FREQS 18バンド) ─────────
+  for (let extra = 0; extra <= 12; extra++) {
+    const off = dataStart + extra;
+    if (off + 18 * 4 > buffer.byteLength) break;
+    const bands = [];
+    for (let i = 0; i < 18; i++) {
+      const gain = view.getFloat32(off + i * 4, true);
+      if (isValidGain(gain)) bands.push({ freq: FEQ_FREQS[i], gain: Math.round(gain * 100) / 100 });
+    }
+    if (bands.length === 18) {
+      console.log(`[XGEQ] E gains-only-18 extra=${extra}:`, bands.slice(0, 3));
+      tryUpdate(bands);
+    }
+  }
+
+  if (bestBands.length > 0) return bestBands;
+  throw new Error('XGEQ: 有効なバンドデータが見つかりません（F12キー→コンソールタブで [XGEQ] を確認してください）');
 }
 
 /**
