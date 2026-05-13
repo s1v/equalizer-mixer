@@ -140,6 +140,19 @@ body {
 }
 
 /* ============================================================
+   Global button text / icon protection
+   ============================================================ */
+button {
+  user-select: none;
+  cursor: pointer;
+}
+
+button *, button svg, button span, button svg * {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================================
    Header Actions (button group in panel-header)
    ============================================================ */
 .header-actions {
