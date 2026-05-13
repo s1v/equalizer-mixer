@@ -377,12 +377,10 @@ function clearEQ(eqKey) {
   updateChart();
 }
 
-// ─── Query Rows ───────────────────────────────────────────────────────────────
+// ─── Query Results ────────────────────────────────────────────────────────────
 
-let nextQueryId = 1;
-// [{ id, freq, result: null | { g1, g2, gm, fLabel } }]
-// id=0 は index.html に静的に存在する初期行と対応
-const queryRows = [{ id: 0, freq: '', result: null }];
+let nextResultId = 0;
+const queryResults = []; // [{ id, g1, g2, gm, fLabel }]
 
 function freqLabel(freq) {
   return freq >= 1000
@@ -390,119 +388,78 @@ function freqLabel(freq) {
     : `${freq} Hz`;
 }
 
-function addQueryFromChart(rawFreq) {
-  const rounded = Math.round(Math.max(FREQ_MIN, Math.min(FREQ_MAX, rawFreq)));
-
-  const id = nextQueryId++;
-  const g1 = gainAtFreq(state.eq1, rounded);
-  const g2 = gainAtFreq(state.eq2, rounded);
-  queryRows.push({
-    id,
-    freq: String(rounded),
-    result: { g1, g2, gm: (g1 + g2) / 2, fLabel: freqLabel(rounded) },
-  });
-  renderQueryRows();
-
-  const el = document.querySelector(`.query-row[data-id="${id}"]`);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function addQueryResult(g1, g2, fLabel) {
+  const gm = (g1 + g2) / 2;
+  queryResults.push({ id: nextResultId++, g1, g2, gm, fLabel });
+  renderQueryResults();
+  // 末尾の新しい結果行にスクロール
+  const list = document.getElementById('query-results-list');
+  list.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function addQueryRow() {
-  const id = nextQueryId++;
-  queryRows.push({ id, freq: '', result: null });
-  renderQueryRows();
-  // Focus the new input
-  const input = document.querySelector(`.query-row[data-id="${id}"] .query-input`);
-  if (input) input.focus();
+function removeQueryResult(id) {
+  const idx = queryResults.findIndex(r => r.id === id);
+  if (idx !== -1) queryResults.splice(idx, 1);
+  renderQueryResults();
 }
 
-function removeQueryRow(id) {
-  const idx = queryRows.findIndex(r => r.id === id);
-  if (idx === -1) return;
-  queryRows.splice(idx, 1);
-  if (queryRows.length === 0) addQueryRow();
-  else renderQueryRows();
+function renderQueryResults() {
+  const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + ' dB';
+  const list    = document.getElementById('query-results-list');
+  const section = document.getElementById('query-results-section');
+
+  list.innerHTML = '';
+  section.hidden = queryResults.length === 0;
+
+  for (const res of queryResults) {
+    const el = document.createElement('div');
+    el.className = 'result-row';
+    el.dataset.id = res.id;
+    el.innerHTML = `
+      <div class="result-cards">
+        <div class="result-item result-item--eq1">
+          <span class="result-label">EQ 1</span>
+          <span class="result-value">${fmt(res.g1)}</span>
+        </div>
+        <div class="result-item result-item--eq2">
+          <span class="result-label">EQ 2</span>
+          <span class="result-value">${fmt(res.g2)}</span>
+        </div>
+        <div class="result-item result-item--mixed">
+          <span class="result-label">ミックス @ ${res.fLabel}</span>
+          <span class="result-value">${fmt(res.gm)}</span>
+        </div>
+      </div>
+      <button class="btn-delete-row" aria-label="削除">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    `;
+    list.appendChild(el);
+  }
 }
 
-function executeQuery(id) {
-  const row  = queryRows.find(r => r.id === id);
-  if (!row) return;
-
-  const freq = parseFloat(row.freq);
+function doManualQuery() {
+  const input = document.getElementById('query-freq-input');
+  const freq  = parseFloat(input.value);
   if (!isFinite(freq) || freq <= 0) {
-    row.result = { error: '有効な周波数を入力してください（例: 1000）' };
-    renderQueryRows();
+    input.classList.add('input-error');
+    setTimeout(() => input.classList.remove('input-error'), 600);
     return;
   }
-
   const g1 = gainAtFreq(state.eq1, freq);
   const g2 = gainAtFreq(state.eq2, freq);
-  row.result = { g1, g2, gm: (g1 + g2) / 2, fLabel: freqLabel(freq) };
-  renderQueryRows();
-
-  // Add new empty row only if this is the last one
-  const isLast = queryRows[queryRows.length - 1].id === id;
-  if (isLast) addQueryRow();
+  addQueryResult(g1, g2, freqLabel(freq));
+  input.value = '';
+  input.focus();
 }
 
-function renderQueryRows() {
-  const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + ' dB';
-  const container = document.getElementById('query-rows');
-  container.innerHTML = '';
-
-  for (const row of queryRows) {
-    const el = document.createElement('div');
-    el.className = 'query-row';
-    el.dataset.id = row.id;
-
-    if (row.result && !row.result.error) {
-      // 取得済み: カードと削除ボタンのみ（入力欄・取得ボタンなし）
-      const { g1, g2, gm, fLabel } = row.result;
-      el.innerHTML = `
-        <div class="result-cards">
-          <div class="result-item result-item--eq1">
-            <span class="result-label">EQ 1</span>
-            <span class="result-value">${fmt(g1)}</span>
-          </div>
-          <div class="result-item result-item--eq2">
-            <span class="result-label">EQ 2</span>
-            <span class="result-value">${fmt(g2)}</span>
-          </div>
-          <div class="result-item result-item--mixed">
-            <span class="result-label">ミックス @ ${fLabel}</span>
-            <span class="result-value">${fmt(gm)}</span>
-          </div>
-        </div>
-        <button class="btn-delete-row" aria-label="この行を削除">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
-      `;
-    } else {
-      // 未取得: 入力欄と取得ボタン（削除ボタンなし）
-      const errorHTML = row.result?.error
-        ? `<span class="result-error">${row.result.error}</span>`
-        : '';
-      el.innerHTML = `
-        <div class="query-input-wrap">
-          <input
-            type="number"
-            class="query-input"
-            placeholder="1000"
-            min="1" max="96000" step="1"
-            value="${row.freq}"
-            aria-label="周波数 (Hz)"
-          >
-          <span class="query-unit">Hz</span>
-        </div>
-        <button class="btn-primary btn-get">取得</button>
-        ${errorHTML}
-      `;
-    }
-
-    container.appendChild(el);
-  }
+function addQueryFromChart(rawFreq) {
+  const rounded = Math.round(Math.max(FREQ_MIN, Math.min(FREQ_MAX, rawFreq)));
+  const g1 = gainAtFreq(state.eq1, rounded);
+  const g2 = gainAtFreq(state.eq2, rounded);
+  addQueryResult(g1, g2, freqLabel(rounded));
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
@@ -537,35 +494,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Query rows — event delegation on container
-  document.getElementById('query-rows').addEventListener('click', e => {
-    const row = e.target.closest('.query-row');
-    if (!row) return;
-    const id = Number(row.dataset.id);
-
-    if (e.target.closest('.btn-get')) {
-      executeQuery(id);
-    } else if (e.target.closest('.btn-delete-row')) {
-      removeQueryRow(id);
-    }
+  // Query: 取得ボタン・Enterキー
+  document.getElementById('query-submit-btn').addEventListener('click', doManualQuery);
+  document.getElementById('query-freq-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doManualQuery();
   });
 
-  document.getElementById('query-rows').addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
-    const input = e.target.closest('.query-input');
-    if (!input) return;
-    const row = input.closest('.query-row');
-    if (!row) return;
-    executeQuery(Number(row.dataset.id));
-  });
-
-  document.getElementById('query-rows').addEventListener('input', e => {
-    const input = e.target.closest('.query-input');
-    if (!input) return;
-    const row = input.closest('.query-row');
-    if (!row) return;
-    const r = queryRows.find(r => r.id === Number(row.dataset.id));
-    if (r) r.freq = input.value;
+  // Query: 結果の削除（イベント委譲）
+  document.getElementById('query-results-list').addEventListener('click', e => {
+    const btn = e.target.closest('.btn-delete-row');
+    if (!btn) return;
+    const row = btn.closest('.result-row');
+    if (row) removeQueryResult(Number(row.dataset.id));
   });
 
   // Chartの初期化はイベントリスナー設定後に行う

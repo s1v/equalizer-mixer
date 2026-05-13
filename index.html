@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <div class="app">
@@ -103,21 +103,25 @@
         <div class="panel-header">
           <h2 class="panel-title">ゲインを取得</h2>
         </div>
-        <div id="query-rows" class="query-rows">
-          <div class="query-row" data-id="0">
-            <div class="query-input-wrap">
-              <input
-                type="number"
-                class="query-input"
-                placeholder="1000"
-                min="1" max="96000" step="1"
-                value=""
-                aria-label="周波数 (Hz)"
-              >
-              <span class="query-unit">Hz</span>
-            </div>
-            <button class="btn-primary btn-get">取得</button>
+        <!-- 入力フォーム（常に最上部） -->
+        <div class="query-form-row">
+          <div class="query-input-wrap">
+            <input
+              type="number"
+              id="query-freq-input"
+              class="query-input"
+              placeholder="1000"
+              min="1" max="96000" step="1"
+              aria-label="周波数 (Hz)"
+            >
+            <span class="query-unit">Hz</span>
           </div>
+          <button class="btn-primary" id="query-submit-btn">取得</button>
+        </div>
+        <!-- 取得結果（1件以上あるとき表示） -->
+        <div id="query-results-section" hidden>
+          <div class="query-divider"></div>
+          <div id="query-results-list" class="query-results-list"></div>
         </div>
       </div>
 
@@ -125,6 +129,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
