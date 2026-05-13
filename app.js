@@ -176,7 +176,7 @@ const state = {
   ],
 };
 
-let decimalPlaces = 2;
+let decimalPlaces = 1;
 
 // ─── Chart ────────────────────────────────────────────────────────────────────
 
@@ -683,13 +683,14 @@ function openModal(mode, target) {
   }
 
   // リセット
-  fileInput.value = '';
-  errorEl.hidden  = true;
+  fileInput.value  = '';
+  errorEl.hidden   = true;
   errorEl.textContent = '';
 
-  // format ラジオを feq に戻す
+  // format ラジオを feq に戻し、accept も同期
   const radios = overlay.querySelectorAll('input[name="modal-format"]');
   radios.forEach(r => { r.checked = r.value === 'feq'; });
+  fileInput.accept = '.feq';
 
   overlay.hidden = false;
   // アクセシビリティ: フォーカスをモーダルに移動
